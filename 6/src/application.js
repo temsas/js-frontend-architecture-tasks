@@ -41,5 +41,91 @@ const validate = (fields) => {
 };
 
 // BEGIN
+export default () => {
+  const state = {
+    form: {
+      fields: {
+        name: '',
+        email: '',
+        password: '',
+        passwordConfirmation: '',
+      },
+      errors: {},
+      isValid: false,
+      submissionStatus: 'idle',
+    },
+  };
 
+  const form = document.querySelector('[data-form="sign-up"]');
+  const container = document.querySelector('[data-container="sign-up"]');
+  const submitButton = form.querySelector('input[type="submit"]');
+
+  const watchedState = onChange(state, (path, value) => {
+    if (path.startsWith('form.fields')) {
+      watchedState.form.errors = validate(watchedState.form.fields);
+      watchedState.form.isValid = isEmpty(watchedState.form.errors);
+    }
+
+    if (path.startsWith('form.errors') || path === 'form.isValid') {
+      ['name', 'email', 'password', 'passwordConfirmation'].forEach((fieldName) => {
+        const input = form.querySelector(`[name="${fieldName}"]`);
+        const errorDiv = input.nextElementSibling?.classList.contains('invalid-feedback')
+            ? input.nextElementSibling
+            : null;
+
+        if (has(watchedState.form.errors, fieldName)) {
+          input.classList.add('is-invalid');
+          if (!errorDiv) {
+            const newErrorDiv = document.createElement('div');
+            newErrorDiv.classList.add('invalid-feedback');
+            newErrorDiv.textContent = watchedState.form.errors[fieldName].message;
+            input.parentElement.appendChild(newErrorDiv);
+          } else {
+            errorDiv.textContent = watchedState.form.errors[fieldName].message;
+          }
+        } else {
+          input.classList.remove('is-invalid');
+          if (errorDiv) {
+            errorDiv.remove();
+          }
+        }
+      });
+
+      submitButton.disabled = !watchedState.form.isValid || watchedState.form.submissionStatus === 'submitting';
+    }
+
+    if (path === 'form.submissionStatus') {
+      if (value === 'success') {
+        container.innerHTML = 'User Created!';
+      } else if (value === 'error') {
+        const errorDiv = document.createElement('div');
+        errorDiv.classList.add('invalid-feedback', 'd-block');
+        errorDiv.textContent = errorMessages.network.error;
+        form.appendChild(errorDiv);
+      }
+    }
+  });
+
+  ['name', 'email', 'password', 'passwordConfirmation'].forEach((fieldName) => {
+    const input = form.querySelector(`[name="${fieldName}"]`);
+    input.addEventListener('input', (e) => {
+      watchedState.form.fields[fieldName] = e.target.value;
+    });
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (!watchedState.form.isValid) return;
+
+    watchedState.form.submissionStatus = 'submitting';
+
+    const response = await axios.post(routes.usersPath(), watchedState.form.fields);
+    if (response) {
+      watchedState.form.submissionStatus = 'success';
+    } else {
+      watchedState.form.submissionStatus = 'error';
+    }
+  });
+};
 // END
